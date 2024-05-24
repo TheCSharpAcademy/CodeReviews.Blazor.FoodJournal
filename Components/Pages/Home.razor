@@ -1,0 +1,204 @@
+﻿@page "/"
+@rendermode InteractiveServer
+@inject ErrorHandler UIreturn
+@inject IToastService ToastService
+@inject StatsService _statsService
+
+<PageTitle>Home</PageTitle>
+
+<br />
+<FluentStack Orientation="Orientation.Vertical" HorizontalAlignment="HorizontalAlignment.Left" VerticalGap="50">
+    <FluentStack Orientation="Orientation.Horizontal" HorizontalAlignment="HorizontalAlignment.Left" HorizontalGap="50" Wrap="true">
+        <FluentCard Width="160px" Style="background-color:cornflowerblue;color:white">
+            <div style="display:flex;justify-content:end">
+                <FluentEmoji Value="@(new Emojis.FoodDrink.Color.Default.BentoBox())" Width="32px" />
+                </div>
+            <div style="display:flex;flex-direction:column; justify-content:center">
+                <p style="font-size:2rem">@stats.TotalMeals</p>
+
+                <br />
+                <p>Total meals</p>
+            </div>
+          
+        </FluentCard>
+
+        <FluentCard Width="160px" Style="background-color:#aad15f;color:white">
+            
+            <div style="display:flex;justify-content:end">
+                <FluentEmoji Value="@(new Emojis.FoodDrink.Color.Default.Avocado())" />
+                </div>
+            <div style="display:flex;flex-direction:column; justify-content:center">
+                <p style="font-size:2rem">@stats.TotalFoods</p>
+
+                <br />
+                <p>Total foods</p>
+            </div>
+
+        </FluentCard>
+
+        <FluentCard Width="160px" Style="background-color:palevioletred;color:white">
+            
+            <div style="display:flex;justify-content:end">
+                <FluentEmoji Value="@(new Emojis.TravelPlaces.Color.Default.Stopwatch())" />
+            </div>
+            <div style="display:flex;flex-direction:column; justify-content:center">
+                <p style="font-size:2rem">@(string.Format("{0:F1}", (stats.TotalCalories / 1000))) K</p>
+                <br />
+                <p>Total Calories</p>
+            </div>
+           
+        </FluentCard>
+
+        <FluentCard Width="160px" Style="background-color:tan;color:white">
+            <div style="display:flex;justify-content:end">
+                <FluentEmoji Value="@(new Emojis.TravelPlaces.Color.Default.Fire())" />
+            </div>
+            <div style="display:flex;flex-direction:column; justify-content:center">
+                <p style="font-size:2rem">@stats.AvarageCaloriesPerDay</p>
+                <br />
+                <p>Calories per day</p>
+            </div>
+        </FluentCard>
+
+        <FluentCard Width="160px" Style="background-color:indianred;color:white">
+            <div style="display:flex;justify-content:end">
+                <FluentEmoji Value="@(new Emojis.SmileysEmotion.Color.Default.ShushingFace())" />
+            </div>
+            <div style="display:flex;flex-direction:column; justify-content:center">
+                <p style="font-size:2rem">@($"{stats.TrickedMeals:p1}")</p>
+                <br />
+                <p>Tricked meals</p>
+            </div>
+        </FluentCard>
+
+            <div>
+            <FluentStack Orientation="Orientation.Vertical" HorizontalAlignment="HorizontalAlignment.Left" VerticalGap="10">
+                <FluentButton BackgroundColor="#5E59A6" Color="White" Style="Width:200px" @onclick="GetAllTimes">All times</FluentButton>
+                <FluentButton BackgroundColor="#8559A6" Color="White" Style="Width:200px" @onclick="GetLastMonth">Last month</FluentButton>
+                <FluentButton BackgroundColor="#597AA6" Color="White" Style="Width:200px" @onclick="GetLastWeek">Last week</FluentButton>
+            </FluentStack>
+        </div>
+           
+    
+    </FluentStack>
+
+       <FluentStack Orientation="Orientation.Horizontal">
+        <FluentCard Width="300px" Style="background-color:indianred;color:white">
+            <div style="display:flex;justify-content:end">
+                <FluentEmoji Value="@(new Emojis.FoodDrink.Color.Default.ChocolateBar())" />
+            </div>
+            <div style="display:flex;flex-direction:column; justify-content:center">
+                <p style="font-size:2rem">@stats.MostTrickedFood</p>
+                <br />
+                <p>Most tricked food</p>
+            </div>
+        </FluentCard>
+
+        <FluentCard Width="300px" Style="background-color:#aad15f;color:white">
+            <div style="display:flex;justify-content:end">
+                <FluentEmoji Value="@(new Emojis.PeopleBody.Color.Light.ManCook())" />
+            </div>
+            <div style="display:flex;flex-direction:column; justify-content:center">
+                @if(stats!=null){
+                @foreach (var food in stats.MostFavoriteMeal.Foods)
+                {
+                    <p style="font-size:2rem">@food.Name</p>
+                    }
+                }
+                else
+                {
+                    <p>?</p>
+                }
+
+                <br />
+                <p>Most preferred meal</p>
+            </div>
+        </FluentCard>
+    </FluentStack>
+
+
+</FluentStack>
+@code {
+    Stats DummyStats =new()
+        {
+            TotalCalories = 0,
+            TotalFoods = 0,
+            TotalMeals = 0,
+            MostFavoriteFood = "Not recorded",
+            MostFavoriteMeal = new Meal() { Foods = new() { new Food() { Name = "Not recorded" } } },
+            MostTrickedFood = "Not recorded",
+            AvarageCaloriesPerDay = 0
+        };
+    Stats stats=new();
+    Meal meal = new();
+    List<Food> foods = new();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        
+        if (!string.IsNullOrEmpty(UIreturn.MessageToUI))
+        {
+
+            ToastService.ShowInfo(UIreturn.MessageToUI);
+        }
+        ResetMessage();
+
+
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        meal.Foods = foods;
+        stats.MostFavoriteMeal = meal;
+        try
+        {
+            stats = await _statsService.GetStats(DateTime.MinValue, DateTime.Now);
+        }
+        catch
+        {
+            stats = DummyStats;
+        }
+    }
+
+    private async Task ResetMessage()
+    {
+        await Task.Delay(300);
+        UIreturn.MessageToUI = null;
+    }
+
+    private async Task GetAllTimes()
+    {
+        try
+        {
+            stats = await _statsService.GetStats(DateTime.MinValue, DateTime.Now);
+        }
+        catch
+        {
+            stats = DummyStats;
+        }
+    }
+
+    private async Task GetLastMonth()
+    {
+        try
+        {
+            stats = await _statsService.GetStats(DateTime.Now - TimeSpan.FromDays(30), DateTime.Now);
+        }
+        catch
+        {
+            stats = DummyStats;
+        }
+    }
+
+    private async Task GetLastWeek()
+    {   try{
+            stats = await _statsService.GetStats(DateTime.Now - TimeSpan.FromDays(7), DateTime.Now);
+        }
+        catch
+        {
+            stats = DummyStats;
+        }
+    }
+
+
+}

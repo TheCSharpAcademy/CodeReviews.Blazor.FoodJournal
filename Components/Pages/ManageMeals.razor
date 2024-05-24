@@ -1,0 +1,215 @@
+﻿@page "/ManageMeals"
+@rendermode InteractiveServer
+@inject MealService _mealService
+@inject ErrorHandler UIreturn
+@inject NavigationManager navManager
+@inject IDialogService DialogService
+@inject IToastService ToastService
+
+<FluentHeader>
+    Meal Management
+    <FluentSpacer />
+    
+        <FluentDatePicker @bind-Value="@searchDate" />
+    <FluentSpacer Width="50" />
+       <FluentSearch @ref=searchMeal
+                      @bind-Value="@searchValue"
+                      Placeholder="Search per food" />
+
+        <FluentSpacer Width="50" />
+
+        <span><small>Meal type</small></span>
+        <FluentSpacer Width="10" />
+        <FluentSelect TOption="string"
+                      Name="selectedMeal.Type"
+                      Items="@mealTypeFilterList"
+                      Id="mealtype-listbox"
+                      OptionValue="@(p => p)"
+                      OptionText="@(p => p)"
+                      @bind-SelectedOption="@mealFilter" />
+    
+
+    <FluentSpacer Width="30" />
+    <FluentCheckbox Id="check1" ThreeState="true" @bind-CheckState="@isFavoriteFilter" Style="min-width: 250px;"><span style="color:white">Favorite</span></FluentCheckbox>
+    <FluentSpacer Width="10" />
+    <FluentButton Type="ButtonType.Submit"
+                  OnClick="FilterMeals"
+                  BackgroundColor="#44BBA4"
+                  Color="#FEF9EF"> Search</FluentButton>
+
+</FluentHeader>
+<br />
+
+
+
+
+
+
+<FluentDataGrid @ref="@MealGrid" TGridItem="Meal" Items="@FilteredMeals" ShowHover="true" ResizableColumns=true Pagination="@pagination" GridTemplateColumns="0.2fr 0.1fr 0.1fr 0.6fr 0.2fr 0.2fr" RowClass="@rowClass" RowStyle="@rowStyle" Style="height: auto;overflow:auto;">
+
+    <PropertyColumn Property="@(c => c.Date)" Sortable="true" Tooltip="true" Title="Meal Date" />
+    <PropertyColumn Property="@(c => c.Type)" Sortable="true" Align="Align.Start" Tooltip="true" />
+    <PropertyColumn Property="@(c => c.IsFavorite)" Sortable="true" Align="Align.Center" Tooltip="true" />
+    <PropertyColumn Property="@(c => c.Description)" Sortable="true" Align="Align.Start" />
+    <TemplateColumn Title="Foods" Align="@Align.Center">
+        <FluentButton Id="@context.Id.ToString()" aria-label="FoodList" IconEnd="@(new Icons.Regular.Size16.Food())" @onclick="() => {   foodList=context.Foods;
+                                                                                                                                         popoverId=context.Id.ToString();
+                                                                                                                                         _visibleL = !_visibleL;
+                                                                                                                                      }" />
+     </TemplateColumn>
+
+    
+    <TemplateColumn Title="Actions" Align="@Align.End">
+        <FluentButton aria-label="Edit item" IconEnd="@(new Icons.Regular.Size16.Edit())" OnClick="@(() => OpenEditDialogAsync(context))" />
+        <FluentButton aria-label="Delete item" IconEnd="@(new Icons.Regular.Size16.Delete())" OnClick="@(()=>OpenDeleteDialogAsync(context))" />
+    </TemplateColumn>
+
+</FluentDataGrid>
+<FluentPopover Style="width: 300px;" VerticalThreshold="170" AnchorId="@popoverId" @bind-Open="_visibleL">
+    <Header>
+        <p class="pacifico-regular">----Menu----</p>
+    </Header>
+    <Body>
+        @foreach(var food in foodList)
+        {
+            <p>@food.Name</p>
+        }
+    </Body>
+   
+</FluentPopover>
+
+
+<FluentPaginator State="@pagination" />
+
+
+
+<style>
+    .pacifico-regular {
+        font-family: "Pacifico", cursive;
+        font-weight: 400;
+        font-style: normal;
+        font-size:1.2em</style>
+ 
+@code {
+    DateTime? searchDate = null;
+    FluentDataGrid<Meal> MealGrid;
+    bool? isFavoriteFilter;
+    FluentSearch? searchMeal;
+    string? searchValue;
+    string? mealFilter;
+    List<string>? mealTypeFilterList;
+    List<Food> foodList = new();
+    string? popoverId;
+    bool _visibleL;
+    List<Food>? mealFoodList=new();
+    bool _clearItems = false;
+    IQueryable<Meal>? meals;
+    PaginationState pagination = new PaginationState { ItemsPerPage = 10 };
+    string nameFilter = string.Empty;
+
+    GridSort<Meal> rankSort = GridSort<Meal>
+        .ByDescending(x => x.Date)
+        .ThenDescending(x => x.MealTypeString)
+        .ThenDescending(x => x.IsFavorite);
+
+    Func<Meal, string?> rowClass = x => x.MealTypeString.StartsWith("D") ? "highlighted-row" : null;
+    Func<Meal, string?> rowStyle = x => x.MealTypeString.StartsWith("S") ? null : null;
+    IQueryable<Meal>? FilteredMeals ;
+
+    ConfirmDeleteModel _confirmDeleteModel = new()
+        {
+            Message = "meal"
+        };
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        meals = (await _mealService.GetMeals()).AsQueryable();
+        popoverId = "";
+        mealTypeFilterList = Enum.GetNames(typeof(MealType)).ToList();
+        mealTypeFilterList.Insert(0, "All");
+        FilteredMeals = meals;
+
+           }
+
+    private async Task FilterMeals()
+    {
+        var queryMeals = (await _mealService.GetMealsByFilter(searchDate, searchValue, mealFilter, isFavoriteFilter)).AsQueryable();
+        if (queryMeals != null)
+            FilteredMeals = queryMeals;
+        await MealGrid.RefreshDataAsync();
+        searchDate = null;
+        searchValue = null;
+        mealFilter = "All";
+        isFavoriteFilter = null;
+    }
+
+    private async Task ToggleItemsAsync()
+    {
+        if (_clearItems)
+        {
+            meals = null;
+        }
+        else
+        {
+            meals = (await _mealService.GetMeals()).AsQueryable();
+        }
+    }
+
+    private async Task OpenDeleteDialogAsync(Meal mealToDelete)
+    {
+
+        DialogParameters parameters = new()
+            {
+                Title = $"Delete this meal?",
+                PrimaryAction = "Yes",
+                PrimaryActionEnabled = true,
+                SecondaryAction = "No",
+                Width = "500px",
+                TrapFocus = true,
+                Modal = true,
+                PreventScroll = true
+            };
+
+
+        IDialogReference dialog = await DialogService.ShowDialogAsync<ConfirmDelete>(_confirmDeleteModel, parameters);
+        DialogResult? result = await dialog.Result;
+
+
+        if (!result.Cancelled)
+        {
+            UIreturn.MessageToUI = await _mealService.DeleteMeal(mealToDelete.Id);
+            navManager.NavigateTo("/ManageMeals", true);
+        }
+
+    }
+
+    private async Task OpenEditDialogAsync(Meal mealToUpdate)
+    {
+
+        DialogParameters parameters = new()
+            {
+                Title = $"Edit meal",
+                PrimaryAction="Click Submit to save changes",
+                PrimaryActionEnabled =false,
+                SecondaryAction = "Cancel",
+                Width = "1500px",
+                TrapFocus = true,
+                Modal = true,
+                PreventScroll = true
+            };
+
+
+        IDialogReference dialog = await DialogService.ShowDialogAsync<EditMeal>(mealToUpdate, parameters);
+        DialogResult? result = await dialog.Result;
+
+
+        if (result.Cancelled)
+        {
+            
+            navManager.NavigateTo("/ManageMeals", true);
+        }
+
+    }
+}
+

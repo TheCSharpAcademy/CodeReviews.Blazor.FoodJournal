@@ -1,0 +1,43 @@
+﻿@rendermode InteractiveServer
+
+<div class="navmenu">
+    <input type="checkbox" title="Menu expand/collapse toggle" id="navmenu-toggle" class="navmenu-icon" />
+    <label for="navmenu-toggle" class="navmenu-icon"><FluentIcon Value="@(new Icons.Regular.Size20.Navigation())" Color="Color.Fill" /></label>
+    <nav class="sitenav" aria-labelledby="main-menu" onclick="document.getElementById('navmenu-toggle').click();">
+        <FluentNavMenu Id="main-menu" Collapsible="true" Width="250" Title="Navigation menu" @bind-Expanded="expanded">
+            <FluentNavLink Href="/" Match="NavLinkMatch.All" Icon="@(new Icons.Regular.Size20.Home())" IconColor="Color.Accent">Home</FluentNavLink>
+            <FluentNavLink Href="AddMealFromFavorites" Icon="@(new Icons.Regular.Size20.StackAdd())" IconColor="Color.Accent">New meal from favorites</FluentNavLink>
+            <FluentNavLink Href="AddMeal" Icon="@(new Icons.Regular.Size20.AddCircle())" IconColor="Color.Accent">New meal</FluentNavLink>
+
+            <FluentNavLink Href="ManageFoods" Icon="@(new Icons.Regular.Size20.FoodApple())" IconColor="Color.Accent">Manage Foods</FluentNavLink>
+            <FluentNavLink Href="ManageMeals" Icon="@(new Icons.Regular.Size20.Food())" IconColor="Color.Accent">Manage Meals</FluentNavLink>
+            <FluentCheckbox @bind-Value="@lightMode" Label="Light Mode" @onchange="OnDarkModeChange" />
+            
+            <FluentDesignTheme @bind-Mode="@Mode" OfficeColor="@officeColor" StorageName="theme" />
+
+            
+            
+
+        </FluentNavMenu>
+    </nav>
+</div>
+
+@code {
+
+    bool lightMode = false;
+    DesignThemeModes Mode;
+    private bool expanded = true;
+    OfficeColor? officeColor { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+       lightMode= (Mode == DesignThemeModes.Light)? true:false;
+        
+    }
+    void OnDarkModeChange(ChangeEventArgs e)
+    {
+        Mode = lightMode ? DesignThemeModes.Dark : DesignThemeModes.Light;
+        officeColor = lightMode ? OfficeColor.Office : OfficeColor.PowerApps;
+    }
+
+}

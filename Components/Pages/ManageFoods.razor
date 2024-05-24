@@ -1,0 +1,292 @@
+﻿@page "/ManageFoods"
+@rendermode InteractiveServer
+@inject FoodService _foodService
+@inject ErrorHandler UIreturn
+@inject NavigationManager navManager
+@inject IDialogService DialogService
+@inject IToastService ToastService
+
+<FluentSwitch Style="width: 150px;" Disabled="@disableEdit" @bind-Value="ShowEditContent">Edit Food</FluentSwitch>
+<FluentButton  @onclick="ToggleAddFood">Add Food</FluentButton>
+
+<FluentLayout Style="margin-top: 10px;">
+           <FluentHeader>
+            Food Management
+        <FluentSpacer/>
+        @if(!AddNewFood && !ShowEditContent){
+        <FluentSearch @ref=searchFood
+                      @bind-Value="@searchValue"
+                      
+                      Placeholder="Search for food" />
+            
+        <FluentSpacer Width="50" />
+
+        <span><small>Nutrition type</small></span>
+            <FluentSpacer Width="10" />
+        <FluentSelect TOption="string"
+                          Name="selectedFood.NutritionType"
+                          Items="@nutritionsFilterList"
+                          Id="nutrition-listbox"
+                          OptionValue="@(p => p)"
+                          OptionText="@(p => p)"
+                          @bind-SelectedOption="@nutritionFilter"
+                          />
+        }
+        
+        <FluentSpacer Width="30" />
+        <FluentCheckbox Id="check1" ThreeState="true" @bind-CheckState="@foodAvoidFilter" Style="min-width: 250px;" ><span style="color:white">To Avoid</span></FluentCheckbox>
+        <FluentSpacer Width="10" />
+        <FluentButton 
+            Type="ButtonType.Submit" 
+            OnClick="GetFoodsFromDb"
+            BackgroundColor="#44BBA4"
+                      Color="#FEF9EF"> Search</FluentButton>
+       
+        </FluentHeader>
+        <br/>
+
+       
+    
+    
+   
+    <FluentStack Orientation="Orientation.Horizontal" Width="100%">
+        @if (!AddNewFood)
+        {
+        <FluentListbox
+                      Label="Select a food"
+                      Items="@filteredFoodList"
+                      Id="food-listbox"
+                      Height="30rem"
+                      Width="15rem"
+                      OptionValue="@(p=> p.Name)"
+                      OptionText="@(p => p.Name)"
+                     
+                      @bind-SelectedOption="@selectedFood"
+                      />
+        }
+
+        @if (ShowEditContent || AddNewFood)
+        {
+            @if (AddNewFood)
+                tempFood = newFood;
+            @if (ShowEditContent)
+                tempFood = selectedFood;
+
+            @if (tempFood != null)
+            {
+                <EditForm Model="@tempFood" 
+                          OnValidSubmit="@HandleValidSubmit"
+                          FormName="EditFood">
+                <DataAnnotationsValidator />
+                <FluentValidationSummary />
+            
+                <FluentStack Orientation="Orientation.Vertical">
+                    <div>
+                        <FluentTextField Name="selectedFood.Name" @bind-Value=@tempFood.Name Label="Name" Required />
+                    </div>
+
+                    <div>
+                        <FluentSelect TOption="string"
+                                       Name="selectedFood.NutritionType"
+                                       Label="Select nutrition type"
+                                       Items="@nutritions"
+                                       Id="nutrition-listbox"
+                                       OptionValue="@(p => p)"
+                                       OptionText="@(p => p)"
+                                      @bind-Value="@tempFood.NutritionTypeString"
+                                      @bind-SelectedOption="@tempFood.NutritionTypeString" />
+                    </div>
+
+                    <div>
+                        <FluentNumberField Name="selectedFood.Calories" @bind-Value=@tempFood.Calories Label="Calories"/>
+                    </div>
+
+                    <div>
+                        <FluentTextArea Name="tempFood.Description" @bind-Value=@tempFood.Description Label="Description"/>
+                    </div>
+
+                    <div>
+                        <FluentCheckbox Name="tempFood.IsToAvoid" @bind-Value="@tempFood.IsToAvoid" Label="Avoid this food?" />
+                        <FluentValidationMessage For="@(() => tempFood.IsToAvoid)" />
+                    </div>
+                   
+                    <FluentStack>
+                            <FluentButton Type="ButtonType.Submit" Appearance="Appearance.Accent">Submit</FluentButton>
+                            <FluentButton Type="ButtonType.Button" Appearance="Appearance.Outline" @onclick="@OpenDialogAsync">Delete</FluentButton>
+
+                    </FluentStack>
+                    
+                    
+                </FluentStack>
+                </EditForm>
+            } else
+            {
+                <p>Select food from list</p>
+            }
+        } 
+        else
+        {
+            if(selectedFood!=null && selectedFood.Name!=null){
+            <FluentCard>
+                <h4 style="color:#00b2ca">@selectedFood.Name</h4>
+                    <span><b>Category:</b> @selectedFood.NutritionTypeString</span><br />
+                <span><b>Calories:</b> @selectedFood.Calories</span> <br />
+                <span><b>Description:</b> @(string.IsNullOrEmpty(selectedFood.Description) ? "" : selectedFood.Description)</span><br />
+                 @if (selectedFood.IsToAvoid) {
+                     <p></p>
+                    <span style="color:Red">Avoid This Food!</span>
+                 }
+            </FluentCard>
+            }
+            else
+            {<p>Select food from list.</p>}
+        }
+    </FluentStack>
+   
+</FluentLayout>
+
+<style>
+    b {color:#7dcfb6}
+</style>
+
+@code {
+        FluentSearch? searchFood;
+        bool ShowHeader = true;
+        bool ShowEditContent = false;
+        bool AddNewFood = false;
+        bool disableEdit = false;
+        bool? foodAvoidFilter;
+        Food newFood=new();
+        Food foodToEdit = new();
+        Food tempFood = new();
+        string[] nutritions;
+        List<string>? nutritionsFilterList;
+        string? selectedNutrition = "";
+        string? searchValue;
+        string? nutritionFilter;
+        ConfirmDeleteModel _confirmDeleteModel = new()
+        {
+            Message = "food"
+        };
+
+
+   
+        Food? selectedFood=new();
+        List<Food> foodList = new();
+        List<Food> filteredFoodList = new();
+        Food temp = new Food();
+        Food temp2 = new Food();
+
+
+        private async Task HandleFilter()
+        {
+            if (!string.IsNullOrEmpty(searchValue))
+                filteredFoodList = foodList.Where(x => x.Name.ToLower().Contains(searchValue.ToLower())).ToList();
+            else
+                filteredFoodList = foodList.ToList();
+            ShowEditContent = false;
+            searchValue = null;
+            nutritionFilter = "All";
+            StateHasChanged();
+        }
+
+    private async Task GetFoodsFromDb()
+    {
+        if (nutritionFilter == "All")
+            nutritionFilter = null;
+        foodList = await _foodService.GetFoods(searchValue, nutritionFilter, foodAvoidFilter);
+        if (foodList == null || foodList.Count<1)
+            ToastService.ShowWarning("No foods found");
+        filteredFoodList = foodList;
+        nutritionFilter = nutritionsFilterList.FirstOrDefault();
+        selectedFood = null;
+        searchValue = null;
+    }
+
+    private void ToggleAddFood()
+    {
+        AddNewFood = !AddNewFood;
+        ShowEditContent = !AddNewFood;
+        if (AddNewFood)
+            disableEdit = true;
+        else {
+            disableEdit = false;
+        }       ShowEditContent = false;
+    }
+
+    private void updateEditFood()
+    {
+        selectedFood.Name=tempFood.Name;
+        StateHasChanged();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+
+        foodList = await _foodService.GetFoods(null,null,null);
+        filteredFoodList=foodList;
+        nutritions = Enum.GetNames(typeof(Nutrition));
+        nutritionsFilterList = nutritions.ToList();
+        nutritionsFilterList.Insert(0,"All");
+      
+    }
+
+
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            if (!string.IsNullOrEmpty(UIreturn.MessageToUI))
+            {
+                ToastService.ShowInfo(UIreturn.MessageToUI);
+            }
+        }
+        ResetMessage();
+    }
+
+    private async Task ResetMessage()
+    {
+        await Task.Delay(300);
+        UIreturn.MessageToUI = null;
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        if (AddNewFood)
+            UIreturn.MessageToUI=await _foodService.AddFood(tempFood);
+        else
+            UIreturn.MessageToUI = await _foodService.UpdateFood(tempFood.Id,tempFood);
+        navManager.NavigateTo("/ManageFoods", true);
+
+    }
+
+    private async Task OpenDialogAsync()
+    {
+       
+        DialogParameters parameters = new()
+            {
+                Title = $"Delete this food?",
+                PrimaryAction = "Yes",
+                PrimaryActionEnabled = true,
+                SecondaryAction = "No",
+                Width = "500px",
+                TrapFocus = true,
+                Modal = true,
+                PreventScroll = true
+            };
+
+
+        IDialogReference dialog = await DialogService.ShowDialogAsync<ConfirmDelete>( _confirmDeleteModel,parameters);
+        DialogResult? result = await dialog.Result;
+
+
+        if (!result.Cancelled)
+        {
+            UIreturn.MessageToUI = await _foodService.DeleteFood(tempFood.Id);
+            navManager.NavigateTo("/ManageFoods", true);
+        }
+
+    }
+
+}

@@ -1,0 +1,117 @@
+﻿@page "/AddMealFromFavorites"
+@rendermode InteractiveServer
+@inject FoodService _foodService
+@inject MealService _mealService
+@inject ErrorHandler UIreturn
+@inject NavigationManager navManager
+@inject IDialogService DialogService
+@inject IToastService ToastService
+
+
+<h3 class="pacifico-regular">Select your favorite meal for today</h3>
+<span> <FluentButton  Appearance="Appearance.Outline" @onclick="@(() => UpdateSelected("Breakfast"))">Breakfast</FluentButton></span>
+<span> <FluentButton Appearance="Appearance.Outline" @onclick="@(() => UpdateSelected("Lunch"))">Lunch</FluentButton></span>
+<span> <FluentButton Appearance="Appearance.Outline" @onclick="@(() => UpdateSelected("Dinner"))">Dinner</FluentButton></span>
+<span> <FluentButton Appearance="Appearance.Outline" @onclick="@(() => UpdateSelected("Snack"))">Snack</FluentButton></span
+<span> <FluentButton Appearance="Appearance.Outline" @onclick="@(() => UpdateSelected("All"))">All</FluentButton></span>
+
+
+<FluentHorizontalScroll Speed="800" Easing=ScrollEasing.EaseInOut>
+
+    @foreach(Meal meal in selectedMeals)
+    {
+        var myMeal = meal;
+        <FluentButton Class="menuButton" Color="#4e070c" Appearance=" Appearance.Outline" @onclick="@(()=>SelectMeal(myMeal))">
+                      
+                @foreach (Food food in meal.Foods)
+                {
+                <p >@food.Name</p>
+                }
+           
+        </FluentButton>
+
+    }
+</FluentHorizontalScroll>
+
+
+<style>
+    h3{
+        color:#d22701;
+    }
+    .menuButton {
+        transition: box-shadow .3s;
+    
+        width: 300px;
+        height: 500px;
+        margin: 30px;
+        border-radius: 30px;
+        border: 1px solid #fde4ce;
+        background: #fff;
+        float: left;
+        color: #4e070c;
+        margin-right: 30px;
+        background-image: url('07.png') !important;
+        background-position:center;
+        background-size:cover;
+    }
+
+   
+    .menuButton p{
+        font-size:1em;
+    }
+
+    .menuButton:hover {
+        box-shadow: 0 0 20px rgba(33,33,33) !important;
+    }
+
+    .pacifico-regular {
+        font-family: "Pacifico", cursive;
+        font-weight: 400;
+        font-style: normal;
+    }
+
+    .menuCard{
+        align-items: flex-start !important;
+    }
+
+</style>
+
+
+
+@code {
+
+    List<Meal> favoriteMeals=new();
+    List<Meal> selectedMeals = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        favoriteMeals= await _mealService.GetMealsByFilter(null,null,null,true);
+        favoriteMeals = favoriteMeals.OrderByDescending(m=> m.Date).ToList();
+        selectedMeals = await _mealService.GetMealsByFilter(null, null, null, true);
+
+    }
+
+    public async Task SelectMeal(Meal meal)
+    {
+        var selected = meal;
+        Meal newMeal = new()
+            {
+                Date = DateTime.Now,
+                Foods = selected.Foods,
+                Description = selected.Description,
+                IsFavorite = false,
+                Type = selected.Type
+            };
+        UIreturn.MessageToUI = await _mealService.AddMeal(newMeal);
+        navManager.NavigateTo("/");
+    }
+
+    public async Task UpdateSelected(string selection)
+    {
+        if (selection != "All")
+            selectedMeals = favoriteMeals.Where(e => e.MealTypeString == selection).ToList();
+        else
+            selectedMeals = favoriteMeals;
+    }
+
+}

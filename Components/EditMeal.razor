@@ -1,0 +1,213 @@
+﻿@implements IDialogContentComponent<Meal>
+@rendermode InteractiveServer
+@inject MealService _mealService
+@inject FoodService _foodService
+@inject ErrorHandler UIreturn
+@inject NavigationManager navManager
+@inject IDialogService DialogService
+@inject IToastService ToastService
+
+ @if (Dialog!=null){
+
+<FluentLayout Style="margin-top: 10px;">
+
+    <FluentStack Orientation="Orientation.Horizontal" >
+
+        <FluentStack Orientation="Orientation.Vertical">
+            <EditForm Model="@Content" OnValidSubmit="@HandleValidSubmit" FormName="updatemeal" novalidate >
+                <DataAnnotationsValidator />
+                <FluentValidationSummary />
+
+                <br />
+                <FluentDatePicker Label="Date" @bind-Value="@Content.Date" />
+                <br />
+                <br />
+                <FluentSelect TOption="string"
+                              Name="Content.NutritionType"
+                              Label="Select meal type"
+                              Items="@mealTypes"
+                              Id="mealType-listbox"
+                              OptionValue="@(p => p)"
+                              OptionText="@(p => p)"
+                              @bind-Value="@Content.MealTypeString"
+                              @bind-SelectedOption="@Content.MealTypeString"
+                             />
+                <br> 
+                <br>
+                <FluentCheckbox Name="Content.IsFavorite" @bind-Value="@Content.IsFavorite" Label="Make favorite meal"  />
+                <br>
+                <br>
+                <FluentTextArea @bind-Value=@Content.Description Label="Description"  />
+                <br>
+                <br>
+                <FluentStack >
+                    <FluentButton Type="ButtonType.Submit" Appearance="Appearance.Accent">Submit</FluentButton>
+                   
+
+                </FluentStack>
+            </EditForm>
+        </FluentStack>
+
+
+        <FluentStack Orientation="Orientation.Vertical"  >
+        <h5>Foods in this meal</h5>
+        <FluentSortableList Id="foodsOfNewMeal"
+                            Fallback="false"
+                            Group="cloning"
+                            Clone="true"
+                            OnUpdate="@SortMealFoods"
+                            OnRemove="@RemoveFood"
+                            Items="@Content.Foods"
+                            Style="Width:150px"
+                            Context="item"
+                            Class="foodofmeals"
+                            >
+            <ItemTemplate>@item.Name</ItemTemplate>
+        </FluentSortableList>
+        </FluentStack>
+
+        <FluentStack Orientation="Orientation.Vertical">
+                    <h5>Drag food to meal</h5>
+                    <FluentStack Orientation="Orientation.Horizontal" >
+                          <FluentSearch @ref=searchTest
+                              @bind-Value="@searchValue"
+                              @bind-Value:after=HandleSearchInput
+                              Placeholder="Search for Food"/>
+                   <FluentButton Type="ButtonType.Button" OnClick="GetAllFoods">Show all foods</FluentButton>
+
+                    </FluentStack>
+                    
+                    <FluentSortableList Id="foodsFromDb"
+                                        Group="cloning"
+                                        Fallback="false"
+                                        Drop="true" 
+                                        Clone="true" 
+                                        OnRemove="@DbListRemove" 
+                                        Items="@FoodListFromDb"
+                                        Style="Width:150px"
+                                        Sort="false"
+                                        Context="item"
+                                       >
+
+                <ItemTemplate>@item.Name</ItemTemplate>
+                    </FluentSortableList>       
+        </FluentStack>
+
+</FluentStack>
+</FluentLayout>
+
+
+
+
+ }
+
+@code {
+    [Parameter]
+    public Meal Content { get; set; } = default!;
+    [CascadingParameter]
+    public FluentDialog? Dialog { get; set; }
+
+        FluentSearch? searchTest;
+        string? searchValue = string.Empty;
+        List<Food> SelectedFoods = new();
+        List<Food> FoodListFromDb = new();
+        string[] mealTypes;
+    private DateTime? SelectedDay = DateTime.Now;
+
+
+        protected override async Task OnInitializedAsync()
+        {
+         mealTypes = Enum.GetNames(typeof(MealType));
+         
+        }
+
+       
+        private async Task GetAllFoods()
+        {
+        FoodListFromDb = await _foodService.GetFoods(null, null, null);
+        }
+
+        private async Task HandleSearchInput()
+        {
+        if (string.IsNullOrWhiteSpace(searchValue))
+        {
+            return;
+        }
+        else
+        {
+            FoodListFromDb = await _foodService.GetFoods(searchValue, null, null);
+        }
+
+        }
+
+
+        private async Task HandleValidSubmit()
+        {
+       
+        Content.Date = SelectedDay!;
+        if (Content.Foods == null || Content.Foods.Count < 1)
+        {
+            ToastService.ShowInfo("Please add foods to meal");
+            return;
+        }
+
+        UIreturn.MessageToUI = await _mealService.UpdateMeal(Content.Id,Content);
+        navManager.NavigateTo("/", true);
+        }
+
+
+        private void SortMealFoods(FluentSortableListEventArgs args)
+        {
+        if (args is null || args.OldIndex == args.NewIndex)
+        {
+            return;
+        }
+
+        var oldIndex = args.OldIndex;
+        var newIndex = args.NewIndex;
+
+        var items = Content.Foods;
+        var itemToMove = items[oldIndex];
+        items.RemoveAt(oldIndex);
+
+        if (newIndex < items.Count)
+        {
+            items.Insert(newIndex, itemToMove);
+        }
+        else
+        {
+            items.Add(itemToMove);
+        }
+      
+        }
+
+        private void RemoveFood(FluentSortableListEventArgs args)
+        {
+        if (args is null)
+        {
+            return;
+        }
+
+        var item = Content.Foods[args.OldIndex];
+        Content.Foods.RemoveAt(args.OldIndex);
+        
+
+        }
+
+
+        private void DbListRemove(FluentSortableListEventArgs args)
+        {
+        if (args is null)
+        {
+            return;
+        }
+
+        var item = FoodListFromDb[args.OldIndex];
+
+        var clone = item;
+
+        Content.Foods.Insert(args.NewIndex, clone);
+       
+        }
+
+}
